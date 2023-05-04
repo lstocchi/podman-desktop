@@ -203,6 +203,7 @@ function validateImageName(event): void {
               on:input="{event => validateImageName(event)}"
               bind:value="{imageToPull}"
               aria-invalid="{imageNameInvalid && imageNameInvalid !== ''}"
+              aria-label="imageName"
               placeholder="Image name"
               required />
             {#if imageNameInvalid}
