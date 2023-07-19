@@ -59,6 +59,7 @@ import type {
 import type { V1ConfigMap, V1Ingress, V1NamespaceList, V1Pod, V1PodList, V1Service } from '@kubernetes/client-node';
 import type { Menu } from '../../main/src/plugin/menu-registry';
 import type { MessageBoxOptions, MessageBoxReturnValue } from '../../main/src/plugin/message-box';
+import type { ContextInfo } from '../../main/src/plugin/api/context-info';
 
 export type DialogResultCallback = (openDialogReturnValue: Electron.OpenDialogReturnValue) => void;
 
@@ -1437,6 +1438,14 @@ function initExposure(): void {
 
   contextBridge.exposeInMainWorld('getPodmanDesktopVersion', async (): Promise<string> => {
     return ipcInvoke('app:getVersion');
+  });
+
+  contextBridge.exposeInMainWorld('listContexts', async (): Promise<ContextInfo[]> => {
+    return ipcInvoke('contextRegistry:listContexts');
+  });
+
+  contextBridge.exposeInMainWorld('getContext', async (extensionId: string): Promise<ContextInfo> => {
+    return ipcInvoke('contextRegistry:getContext', extensionId);
   });
 
   contextBridge.exposeInMainWorld('windowMinimize', async (): Promise<void> => {
