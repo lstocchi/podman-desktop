@@ -66,6 +66,7 @@ import type { OnboardingRegistry } from './onboarding-registry.js';
 import { createHttpPatchedModules } from './proxy-resolver.js';
 import { ModuleLoader } from './module-loader.js';
 import { ExtensionLoaderSettings } from './extension-loader-settings.js';
+import { CommandExecutorImpl } from './command/command-executor-impl.js';
 
 /**
  * Handle the loading of an extension
@@ -600,7 +601,7 @@ export class ExtensionLoader {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         callback: (...args: any[]) => any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        thisArg?: any,
+        thisArg?: any
       ): containerDesktopAPI.Disposable {
         return commandRegistry.registerCommand(command, callback, thisArg);
       },
@@ -608,6 +609,9 @@ export class ExtensionLoader {
       executeCommand<T = unknown>(commandId: string, ...args: any[]): PromiseLike<T> {
         return commandRegistry.executeCommand(commandId, ...args);
       },
+      createCommandExecutor(commandId: string, ...args: any[]): containerDesktopAPI.CommandExecutor {
+        return new CommandExecutorImpl(commandRegistry, commandId, args);
+      } 
     };
 
     //export function executeCommand<T = unknown>(command: string, ...rest: any[]): PromiseLike<T>;

@@ -21,7 +21,7 @@
  */
 import * as os from 'node:os';
 import * as path from 'path';
-import type * as containerDesktopAPI from '@podman-desktop/api';
+import * as containerDesktopAPI from '@podman-desktop/api';
 import { CommandRegistry } from './command-registry.js';
 import { ContainerProviderRegistry } from './container-registry.js';
 import { ExtensionLoader } from './extension-loader.js';
@@ -1069,14 +1069,15 @@ export class PluginSystem {
     });
 
     this.ipcHandle(
-      'command-registry:executeCommandWithFeedback',
-      async (_, command: string, ...args: unknown[]): Promise<void> => {
-        try {
-          apiSender.send('command-execution-start', { command });
-          await commandRegistry.executeCommand(command, ...args);
-        } finally {
-          apiSender.send('command-execution-end', { command });
-        }
+      'command-registry:executeMarkdownCommand',
+      async (_, command: string, ...args: unknown[]): Promise<unknown> => {
+        const executor = containerDesktopAPI.commands.createCommandExecutor(command, args);
+        executor.onDidStart(() => apiSender.send('markdown-command-execution-start', { command }));
+        executor.onDidEnd(() => {
+          apiSender.send('markdown-command-execution-end', { command });
+          executor.dispose();
+        });
+        return executor.execute();
       },
     );
 
