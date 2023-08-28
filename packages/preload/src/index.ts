@@ -830,6 +830,13 @@ function initExposure(): void {
   });
 
   contextBridge.exposeInMainWorld(
+    'executeCommandWithFeedback',
+    async (command: string, ...args: unknown[]): Promise<void> => {
+      return ipcInvoke('command-registry:executeCommandWithFeedback', command, ...args);
+    },
+  );
+
+  contextBridge.exposeInMainWorld(
     'clipboardWriteText',
     async (text: string, type?: 'selection' | 'clipboard'): Promise<void> => {
       return ipcInvoke('clipboard:writeText', text, type);

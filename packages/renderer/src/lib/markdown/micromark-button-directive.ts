@@ -37,7 +37,7 @@ export function button(d: any) {
   // create button html if it has command attribute
   if (d.attributes && 'command' in d.attributes) {
     this.tag(
-      '<button class="px-4 py-[6px] rounded-[4px] text-white text-[13px] whitespace-nowrap bg-purple-600 hover:bg-purple-500 no-underline" onclick="window.executeOnboardingButtonCommand(\'' +
+      '<button class="px-4 py-[6px] rounded-[4px] text-white text-[13px] whitespace-nowrap bg-purple-600 hover:bg-purple-500 no-underline" onclick="window.executeCommandWithFeedback(\'' +
         this.encode(d.attributes.command) +
         '\')">',
     );

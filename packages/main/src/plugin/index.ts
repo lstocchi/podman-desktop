@@ -1068,6 +1068,18 @@ export class PluginSystem {
       return commandRegistry.executeCommand(command, ...args);
     });
 
+    this.ipcHandle(
+      'command-registry:executeCommandWithFeedback',
+      async (_, command: string, ...args: unknown[]): Promise<void> => {
+        try {
+          apiSender.send('command-execution-start', { command });
+          await commandRegistry.executeCommand(command, ...args);
+        } finally {
+          apiSender.send('command-execution-end', { command });
+        }
+      },
+    );
+
     this.ipcHandle('clipboard:writeText', async (_, text: string, type?: 'selection' | 'clipboard'): Promise<void> => {
       return clipboard.writeText(text, type);
     });

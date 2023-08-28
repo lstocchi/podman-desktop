@@ -125,13 +125,24 @@ function normalize(when: string, extension: string): string {
   return when.replaceAll(ONBOARDING_CONTEXT_PREFIX, `${extension}.${SCOPE_ONBOARDING}.`);
 }
 
-async function doExecuteCommand(command: string) {
+// listen to the event "command-execution-start" to enabling spinner
+window.events?.receive('command-execution-start', () => {
   setExecuting(true);
-  await window.executeCommand(command);
+});
+
+// listen to the event "command-execution-end" to disabling spinner
+window.events?.receive('command-execution-end', command => {
   if (!executedCommands.includes(command)) {
     executedCommands.push(command);
   }
   setExecuting(false);
+});
+
+async function doExecuteCommand(command: string) {
+  await window.executeCommandWithFeedback(command);
+  if (!executedCommands.includes(command)) {
+    executedCommands.push(command);
+  }
 }
 
 async function assertStepCompleted() {
@@ -247,8 +258,6 @@ async function cleanContext() {
     }
   });
 }
-
-(window as any).executeOnboardingButtonCommand = (command: string) => doExecuteCommand(command);
 </script>
 
 {#if activeStep}
