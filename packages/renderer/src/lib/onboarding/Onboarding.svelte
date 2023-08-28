@@ -247,6 +247,8 @@ async function cleanContext() {
     }
   });
 }
+
+(window as any).executeOnboardingButtonCommand = (command: string) => doExecuteCommand(command);
 </script>
 
 {#if activeStep}
@@ -316,8 +318,7 @@ async function cleanContext() {
               <OnboardingItem
                 extension="{activeStep.onboarding.extension}"
                 item="{item}"
-                getContext="{() => globalContext}"
-                executeCommand="{command => doExecuteCommand(command)}" />
+                getContext="{() => globalContext}" />
             {/each}
           </div>
         {/each}
