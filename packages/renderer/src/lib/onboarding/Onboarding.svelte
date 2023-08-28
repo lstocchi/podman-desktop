@@ -131,7 +131,7 @@ window.events?.receive('command-execution-start', () => {
 });
 
 // listen to the event "command-execution-end" to disabling spinner
-window.events?.receive('command-execution-end', command => {
+window.events?.receive('command-execution-end', (command: string) => {
   if (!executedCommands.includes(command)) {
     executedCommands.push(command);
   }
