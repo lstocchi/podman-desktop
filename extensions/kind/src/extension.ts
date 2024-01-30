@@ -242,7 +242,7 @@ export async function createProvider(
     },
   };
 
-  // Empty connection descriptive message
+  // Empty connection descriptive message _ test
   providerOptions.emptyConnectionMarkdownDescription = `
   Kind is a Kubernetes utility for running local clusters using single-container "nodes", providing an easy way to create and manage Kubernetes environments for development and testing.\n\nMore information: [kind.sigs.k8s.io](https://kind.sigs.k8s.io/)`;
 
