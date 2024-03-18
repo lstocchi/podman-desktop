@@ -16,6 +16,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
+import { Uri } from '@podman-desktop/api';
 import type Dockerode from 'dockerode';
 
 export interface ContainerPortInfo {
@@ -272,3 +273,8 @@ export interface VolumeCreateOptions {
 }
 
 export interface VolumeCreateResponseInfo extends Dockerode.VolumeCreateResponse {}
+
+export interface ContainerExportOptions {
+  id: string;
+  outputTarget: Uri;
+}

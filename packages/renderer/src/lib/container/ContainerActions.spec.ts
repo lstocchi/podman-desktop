@@ -1,5 +1,5 @@
 /**********************************************************************
- * Copyright (C) 2023 Red Hat, Inc.
+ * Copyright (C) 2023-2024 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import { test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import ContainerActions from './ContainerActions.svelte';
 import type { ContainerInfoUI } from './ContainerInfoUI';
+import { router } from 'tinro';
+import { exportContainerInfo } from '/@/stores/export-container-store';
 
 const container: ContainerInfoUI = {} as ContainerInfoUI;
 
@@ -99,4 +101,16 @@ test('Expect no error and status deleting container', async () => {
   expect(container.state).toEqual('DELETING');
   expect(container.actionError).toEqual('');
   expect(updateMock).toHaveBeenCalled();
+});
+
+test('Expect exportContainerInfo is filled and user redirected to export container page', async () => {
+  const goToMock = vi.spyOn(router, 'goto');
+  const storeSetMock = vi.spyOn(exportContainerInfo, 'set')
+
+  render(ContainerActions, { container });
+  const exportButton = screen.getByRole('button', { name: 'Export Container' });
+  await fireEvent.click(exportButton);
+
+  expect(goToMock).toBeCalledWith('/containers/export');
+  expect(storeSetMock).toBeCalledWith(container);
 });

@@ -43,6 +43,7 @@ import type { WebContents } from 'electron';
 import { app, ipcMain, BrowserWindow, shell, clipboard } from 'electron';
 import type {
   ContainerCreateOptions,
+  ContainerExportOptions,
   ContainerInfo,
   SimpleContainerInfo,
   VolumeCreateOptions,
@@ -426,6 +427,9 @@ export class PluginSystem {
     const taskManager = new TaskManager(apiSender, statusBarRegistry, commandRegistry);
     taskManager.init();
 
+    const dialogRegistry = new DialogRegistry(this.mainWindowDeferred);
+    dialogRegistry.init();
+
     const notificationRegistry = new NotificationRegistry(apiSender, taskManager);
     const menuRegistry = new MenuRegistry(commandRegistry);
     const kubeGeneratorRegistry = new KubeGeneratorRegistry();
@@ -574,9 +578,6 @@ export class PluginSystem {
 
     const webviewRegistry = new WebviewRegistry(apiSender);
     await webviewRegistry.start();
-
-    const dialogRegistry = new DialogRegistry(this.mainWindowDeferred);
-    dialogRegistry.init();
 
     const navigationManager = new NavigationManager(
       apiSender,
@@ -1077,6 +1078,13 @@ export class PluginSystem {
             abortController,
           },
         );
+      },
+    );
+
+    this.ipcHandle(
+      'container-provider-registry:exportContainer',
+      async (_listener, engine: string, options: ContainerExportOptions): Promise<void> => {
+        return containerProviderRegistry.exportContainer(engine, options);
       },
     );
 
@@ -2106,10 +2114,8 @@ export class PluginSystem {
     );
     this.ipcHandle(
       'dialog:saveDialog',
-      async (_listener, dialogId: string, options: containerDesktopAPI.SaveDialogOptions): Promise<void> => {
-        dialogRegistry.saveDialog(options, dialogId).catch((error: unknown) => {
-          console.error('Error opening dialog', error);
-        });
+      async (_listener, dialogId: string, options: containerDesktopAPI.SaveDialogOptions): Promise<containerDesktopAPI.Uri | undefined> => {
+        return dialogRegistry.saveDialog(options, dialogId);
       },
     );
     this.ipcHandle(

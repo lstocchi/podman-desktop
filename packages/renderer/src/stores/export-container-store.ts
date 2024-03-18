@@ -1,5 +1,5 @@
 /**********************************************************************
- * Copyright (C) 2023 Red Hat, Inc.
+ * Copyright (C) 2024 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,25 +16,11 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-export type TaskState = 'running' | 'completed';
-type TaskStatus = 'in-progress' | 'success' | 'failure';
+import type { Writable } from 'svelte/store';
+import { writable } from 'svelte/store';
+import type { ContainerInfoUI } from '../lib/container/ContainerInfoUI';
 
-export interface Task {
-  id: string;
-  name: string;
-  started: number;
-}
-
-export interface StatefulTask extends Task {
-  state: TaskState;
-  status: TaskStatus;
-  progress?: number;
-  gotoTask?: () => void;
-  openFolder?: () => void;
-  error?: string;
-}
-
-export interface NotificationTask extends Task {
-  description: string;
-  markdownActions?: string;
-}
+/**
+ * Defines the store used to define the container to export.
+ */
+export const exportContainerInfo: Writable<ContainerInfoUI> = writable();

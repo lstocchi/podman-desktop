@@ -20,6 +20,7 @@ import type { Menu } from '../../../../main/src/plugin/menu-registry';
 import ContributionActions from '/@/lib/actions/ContributionActions.svelte';
 import { MenuContext } from '../../../../main/src/plugin/menu-registry';
 import { createEventDispatcher, onMount } from 'svelte';
+import { exportContainerInfo } from '/@/stores/export-container-store';
 export let container: ContainerInfoUI;
 export let dropdownMenu = false;
 export let detailed = false;
@@ -102,6 +103,11 @@ async function deleteContainer(): Promise<void> {
   } finally {
     inProgress(false);
   }
+}
+
+async function exportContainer() {
+  exportContainerInfo.set(container);
+  router.goto('/containers/export');
 }
 
 function openTerminalContainer(): void {
@@ -197,6 +203,12 @@ if (dropdownMenu) {
   <ListItemButtonIcon
     title="Restart Container"
     onClick="{() => restartContainer()}"
+    menu="{dropdownMenu}"
+    detailed="{detailed}"
+    icon="{faArrowsRotate}" />
+  <ListItemButtonIcon
+    title="Export Container"
+    onClick="{() => exportContainer()}"
     menu="{dropdownMenu}"
     detailed="{detailed}"
     icon="{faArrowsRotate}" />

@@ -52,6 +52,7 @@ import Webview from './lib/webview/Webview.svelte';
 import IngressDetails from './lib/ingresses-routes/IngressDetails.svelte';
 import RouteDetails from './lib/ingresses-routes/RouteDetails.svelte';
 import ColorsStyle from './lib/style/ColorsStyle.svelte';
+import ContainerExport from './lib/container/ContainerExport.svelte';
 
 router.mode.hash();
 
@@ -105,7 +106,9 @@ window.events?.receive('navigate', (navigationRequest: unknown) => {
         <Route path="/containers/:id/*" breadcrumb="Container Details" let:meta navigationHint="details">
           <ContainerDetails containerID="{meta.params.id}" />
         </Route>
-
+        <Route path="/containers/export/*" breadcrumb="Export Container">
+          <ContainerExport />
+        </Route>
         <Route path="/kube/play" breadcrumb="Play Kubernetes YAML">
           <KubePlayYAML />
         </Route>

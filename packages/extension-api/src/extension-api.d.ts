@@ -1500,7 +1500,7 @@ declare module '@podman-desktop/api' {
     /**
      * The resource the dialog shows when opened.
      */
-    defaultUri?: Uri;
+    defaultUri?: Uri | string;
 
     /**
      * A human-readable string for the open button.

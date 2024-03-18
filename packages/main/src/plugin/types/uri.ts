@@ -18,6 +18,7 @@
 
 import path, { join } from 'path';
 import { isWindows } from '/@/util.js';
+import type { Uri as APIUri } from "@podman-desktop/api";
 
 /**
  * Represents a resource that can be manipulated. The resource is identified by a Uri.
@@ -135,5 +136,26 @@ export class Uri {
       link = `${link}#${this._fragment}`;
     }
     return link;
+  }
+
+  static revive(serialized: APIUri): Uri {
+    if (serialized instanceof Uri) {
+        return serialized;
+    }
+    const serializedProps: Map<string, string> = Object.entries(serialized)
+                .map(([key, value]) => [ 
+                        key.startsWith('_') ? key.substring(1) : key, 
+                        value
+                    ]).reduce((map, [key, value]) => {
+                        map.set(key, value);
+                        return map;
+                      }, new Map());
+    return new Uri(
+        serializedProps.get('scheme') ?? '', 
+        serializedProps.get('authority') ?? '',
+        serializedProps.get('path') ?? '',
+        serializedProps.get('query') ?? '',
+        serializedProps.get('fragment') ?? ''
+    );
   }
 }

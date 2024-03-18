@@ -52,6 +52,11 @@ function gotoTask(taskUI: StatefulTaskUI) {
   // and open the task
   taskUI?.gotoTask?.();
 }
+
+function openFolder(taskUI: StatefulTaskUI) {
+  console.log(taskUI);
+  taskUI?.openFolder?.();
+}
 </script>
 
 <!-- Display a task item-->
@@ -104,6 +109,20 @@ function gotoTask(taskUI: StatefulTaskUI) {
               on:click="{() => {
                 if (isStatefulTask(taskUI)) gotoTask(taskUI);
               }}">Go to task ></button>
+          {/if}
+        </div>
+      </div>
+    {/if}
+
+    {#if isStatefulTask(taskUI) && taskUI.status !== 'failure'}
+      <div class="flex flex-row w-full">
+        <div class="flex flex-1 flex-col w-full items-end text-purple-500 text-xs">
+          {#if taskUI.openFolder}
+            <button
+              class="text-purple-500 cursor-pointer"
+              on:click="{() => {
+                if (isStatefulTask(taskUI)) openFolder(taskUI);
+              }}">Open folder ></button>
           {/if}
         </div>
       </div>

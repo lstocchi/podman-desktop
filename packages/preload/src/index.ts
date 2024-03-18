@@ -25,6 +25,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import EventEmitter from 'events';
 import type {
   ContainerCreateOptions,
+  ContainerExportOptions,
   ContainerInfo,
   SimpleContainerInfo,
   VolumeCreateOptions,
@@ -440,6 +441,13 @@ export function initExposure(): void {
   contextBridge.exposeInMainWorld('deleteContainer', async (engine: string, containerId: string): Promise<void> => {
     return ipcInvoke('container-provider-registry:deleteContainer', engine, containerId);
   });
+
+  contextBridge.exposeInMainWorld(
+    'exportContainer',
+    async (engine: string, options: ContainerExportOptions): Promise<void> => {
+      return ipcInvoke('container-provider-registry:exportContainer', engine, options);
+    },
+  );
 
   let onDataCallbacksLogsContainerId = 0;
   const onDataCallbacksLogsContainer = new Map<number, (name: string, data: string) => void>();
@@ -1308,17 +1316,19 @@ export function initExposure(): void {
 
   const openSaveDialogResponses = new Map<string, OpenSaveDialogResultCallback>();
 
-  const deferedHandleDialog = (): { id: string; deferred: Deferred<string | string[] | undefined> } => {
+  const deferedHandleDialog = (): { id: string; deferred: Deferred<containerDesktopAPI.Uri | string | string[] | undefined> } => {
     // generate id
     const dialogId = idOpenSaveDialog;
     idOpenSaveDialog++;
 
     // create defer object
-    const deferred = new Deferred<string | string[] | undefined>();
+    const deferred = new Deferred<containerDesktopAPI.Uri |string | string[] | undefined>();
 
     // store the dialogID
-    openSaveDialogResponses.set(`${dialogId}`, (result: string | string[] | undefined) => {
+    openSaveDialogResponses.set(`${dialogId}`, (result: containerDesktopAPI.Uri | string | string[] | undefined) => {
+      console.log(result);
       deferred.resolve(result);
+
     });
 
     return { deferred: deferred, id: `${dialogId}` };
@@ -1341,7 +1351,7 @@ export function initExposure(): void {
 
   contextBridge.exposeInMainWorld(
     'saveDialog',
-    async (options?: containerDesktopAPI.SaveDialogOptions): Promise<string | undefined> => {
+    async (options?: containerDesktopAPI.SaveDialogOptions): Promise<containerDesktopAPI.Uri | undefined> => {
       const handle = deferedHandleDialog();
 
       // ask to open file dialog
@@ -1350,7 +1360,7 @@ export function initExposure(): void {
       });
 
       // wait for response
-      return handle.deferred.promise as Promise<string | undefined>;
+      return handle.deferred.promise as Promise<containerDesktopAPI.Uri | undefined>;
     },
   );
 
