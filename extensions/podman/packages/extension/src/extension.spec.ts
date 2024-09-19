@@ -252,21 +252,6 @@ vi.mock('./podman-info-helper', async () => {
     }),
   };
 });
-vi.mock('./wsl-helper', async () => {
-  return {
-    WslHelper: vi.fn().mockImplementation(() => {
-      return {
-        getWSLVersionData: vi.fn().mockImplementation(() => {
-          return Promise.resolve({
-            wslVersion: '1.2.3',
-            kernelVersion: '1.2.3',
-            windowsVersion: '1.2.3',
-          });
-        }),
-      };
-    }),
-  };
-});
 
 vi.mock('./util', async () => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -313,6 +298,45 @@ test('verify create command called with correct values', async () => {
       token: undefined,
       env: {
         CONTAINERS_MACHINE_PROVIDER: VMTYPE.LIBKRUN,
+      },
+    },
+  );
+
+  // wait a call on telemetryLogger.logUsage
+  while ((telemetryLogger.logUsage as Mock).mock.calls.length === 0) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  expect(telemetryLogger.logUsage).toBeCalledWith(
+    'podman.machine.init',
+    expect.objectContaining({ cpus: '2', defaultName: true, diskSize: '250000000000', imagePath: 'custom' }),
+  );
+});
+
+test('verify create command called with correct values', async () => {
+  const spyExecPromise = vi.spyOn(extensionApi.process, 'exec');
+  spyExecPromise.mockImplementationOnce(() => {
+    return Promise.resolve({} as extensionApi.RunResult);
+  });
+  vi.spyOn(extensionApi.process, 'exec').mockResolvedValueOnce({
+    stdout: 'podman version 5.0.0',
+  } as extensionApi.RunResult);
+
+  await extension.createMachine({
+    'podman.factory.machine.cpus': '2',
+    'podman.factory.machine.image-path': 'path',
+    'podman.factory.machine.memory': '1048000000', // 1048MB = 999.45MiB
+    'podman.factory.machine.diskSize': '250000000000', // 250GB = 232.83GiB
+    'podman.factory.machine.win.provider': VMTYPE.HYPERV,
+  });
+  expect(spyExecPromise).toBeCalledWith(
+    podmanCli.getPodmanCli(),
+    ['machine', 'init', '--cpus', '2', '--memory', '999', '--disk-size', '232', '--image-path', 'path', '--rootful'],
+    {
+      logger: undefined,
+      token: undefined,
+      env: {
+        CONTAINERS_MACHINE_PROVIDER: VMTYPE.HYPERV,
       },
     },
   );
@@ -1902,6 +1926,12 @@ describe('registerOnboardingRemoveUnsupportedMachinesCommand', () => {
       stdout: 'podman version 5.0.0',
     } as unknown as extensionApi.RunResult);
 
+    vi.mocked(extensionApi.process.exec).mockResolvedValueOnce({
+      stdout: 'unknown message: 1.2.5.0',
+      stderr: '',
+      command: 'command',
+    });
+
     // two times false (no qemu folders)
     vi.mocked(fs.existsSync).mockReturnValueOnce(false);
     vi.mocked(fs.existsSync).mockReturnValueOnce(false);
@@ -2215,4 +2245,71 @@ test('if a machine stopped is successfully reporting an error in telemetry', asy
   );
 
   expect(spyExecPromise).toBeCalledWith(podmanCli.getPodmanCli(), ['machine', 'stop', 'name'], expect.anything());
+});
+
+test('isWSLAndHypervSupported should return false if it is not windows', async () => {
+  vi.mocked(isWindows).mockReturnValue(false);
+  const wslHypervEnabled = await extension.isWSLAndHypervSupported();
+  expect(wslHypervEnabled).toBeFalsy();
+});
+
+test('isWSLAndHypervSupported should return false if wsl is not enabled', async () => {
+  vi.mocked(isWindows).mockReturnValue(true);
+  vi.spyOn(extensionApi.process, 'exec').mockResolvedValue({
+    stdout: 'unknown message: 1.2.5.0',
+    stderr: '',
+    command: 'command',
+  });
+  const wslHypervEnabled = await extension.isWSLAndHypervSupported();
+  expect(wslHypervEnabled).toBeFalsy();
+});
+
+test('isWSLAndHypervSupported should return false if wsl is enabled but hyperv is not', async () => {
+  vi.mocked(isWindows).mockReturnValue(true);
+  vi.spyOn(extensionApi.process, 'exec').mockImplementation(command => {
+    return new Promise<extensionApi.RunResult>(resolve => {
+      if (command === 'wsl') {
+        resolve({
+          stdout:
+            'WSL version: 2.2.5.0\nKernel version: 5.15.90.1\nWSLg version: 1.0.51\nMSRDC version: 1.2.3770\nDirect3D version: 1.608.2-61064218\nDXCore version: 10.0.25131.1002-220531-1700.rs-onecore-base2-hyp\nWindows version: 10.0.22621.2134',
+          stderr: '',
+          command: 'command',
+        });
+      }
+      if (command === 'powershell.exe') {
+        resolve({
+          stdout: 'True',
+          stderr: '',
+          command: 'command',
+        });
+      }
+    });
+  });
+  const wslHypervEnabled = await extension.isWSLAndHypervSupported();
+  expect(wslHypervEnabled).toBeFalsy();
+});
+
+test('isWSLAndHypervSupported should return true if wsl is enabled and hyperv is enabled', async () => {
+  vi.mocked(isWindows).mockReturnValue(true);
+  vi.spyOn(extensionApi.process, 'exec').mockImplementation((command, args) => {
+    return new Promise<extensionApi.RunResult>(resolve => {
+      if (command === 'wsl') {
+        resolve({
+          stdout:
+            'WSL version: 2.2.5.0\nKernel version: 5.15.90.1\nWSLg version: 1.0.51\nMSRDC version: 1.2.3770\nDirect3D version: 1.608.2-61064218\nDXCore version: 10.0.25131.1002-220531-1700.rs-onecore-base2-hyp\nWindows version: 10.0.22621.2134',
+          stderr: '',
+          command: 'command',
+        });
+      }
+      if (command === 'powershell.exe') {
+        resolve({
+          stdout: args?.[0] === '@(Get-Service vmms).Status' ? 'Running' : 'True',
+          stderr: '',
+          command: 'command',
+        });
+      }
+    });
+  });
+  const wslHypervEnabled = await extension.isWSLAndHypervSupported();
+  expect(wslHypervEnabled).toBeTruthy();
 });

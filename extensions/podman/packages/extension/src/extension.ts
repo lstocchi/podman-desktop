@@ -26,6 +26,7 @@ import type { ContainerEngineInfo, RunError } from '@podman-desktop/api';
 import * as extensionApi from '@podman-desktop/api';
 import { compareVersions } from 'compare-versions';
 
+import { SequenceCheck } from './base-check';
 import { getSocketCompatibility } from './compatibility-mode';
 import { getDetectionChecks } from './detection-checks';
 import { KrunkitHelper } from './krunkit-helper';
@@ -36,7 +37,7 @@ import type { InstalledPodman } from './podman-cli';
 import { getPodmanCli, getPodmanInstallation } from './podman-cli';
 import { PodmanConfiguration } from './podman-configuration';
 import { PodmanInfoHelper } from './podman-info-helper';
-import { PodmanInstall } from './podman-install';
+import { HyperVCheck, PodmanInstall, WSL2Check, WSLVersionCheck } from './podman-install';
 import { PodmanRemoteConnections } from './podman-remote-connections';
 import { RegistrySetup } from './registry-setup';
 import {
@@ -1010,6 +1011,7 @@ export const PODMAN_MACHINE_CPU_SUPPORTED_KEY = 'podman.podmanMachineCpuSupporte
 export const PODMAN_MACHINE_MEMORY_SUPPORTED_KEY = 'podman.podmanMachineMemorySupported';
 export const PODMAN_MACHINE_DISK_SUPPORTED_KEY = 'podman.podmanMachineDiskSupported';
 export const PODMAN_PROVIDER_LIBKRUN_SUPPORTED_KEY = 'podman.isLibkrunSupported';
+export const WSL_HYPERV_ENABLED_KEY = 'podman.wslHypervEnabled';
 
 export function initTelemetryLogger(): void {
   telemetryLogger = extensionApi.env.createTelemetryLogger();
@@ -1259,6 +1261,8 @@ export async function activate(extensionContext: extensionApi.ExtensionContext):
     extensionApi.context.setValue(START_NOW_MACHINE_INIT_SUPPORTED_KEY, isStartNowAtMachineInitSupported(version));
     extensionApi.context.setValue(USER_MODE_NETWORKING_SUPPORTED_KEY, isUserModeNetworkingSupported(version));
     extensionApi.context.setValue(PODMAN_PROVIDER_LIBKRUN_SUPPORTED_KEY, isLibkrunSupported(version));
+    const wslAndHypervEnabled = await isWSLAndHypervSupported();
+    extensionApi.context.setValue(WSL_HYPERV_ENABLED_KEY, wslAndHypervEnabled);
     isMovedPodmanSocket = isPodmanSocketLocationMoved(version);
   }
 
@@ -1722,6 +1726,9 @@ export async function getJSONMachineList(): Promise<MachineJSONListOutput> {
   // if libkrun is supported we want to show both applehv and libkrun machines
   if (installedPodman && isLibkrunSupported(installedPodman.version)) {
     containerMachineProviders.push(...['applehv', 'libkrun']);
+  } else if (await isWSLAndHypervSupported()) {
+    // if wsl and hyperv are enabled show both
+    containerMachineProviders.push(...['wsl', 'hyperv']);
   } else {
     // in all other cases we set undefined so that it executes normally by using the default container provider
     containerMachineProviders.push(undefined);
@@ -1785,6 +1792,22 @@ const PODMAN_MINIMUM_VERSION_FOR_LIBKRUN_SUPPORT = '5.2.0-rc1';
 // Checks if libkrun is supported. Only Mac platform allows this parameter to be tuned
 export function isLibkrunSupported(podmanVersion: string): boolean {
   return isMac() && compareVersions(podmanVersion, PODMAN_MINIMUM_VERSION_FOR_LIBKRUN_SUPPORT) >= 0;
+}
+
+export async function isWSLAndHypervSupported(): Promise<boolean> {
+  let bothWSLAndHypervSupported = false;
+  if (!isWindows()) {
+    return bothWSLAndHypervSupported;
+  }
+
+  const wslCheck = new SequenceCheck('WSL platform', [new WSLVersionCheck(), new WSL2Check()]);
+  const wslCheckResult = await wslCheck.execute();
+  if (wslCheckResult.successful) {
+    const hyperVCheck = new HyperVCheck();
+    const hyperVCheckResult = await hyperVCheck.execute();
+    bothWSLAndHypervSupported = hyperVCheckResult.successful;
+  }
+  return bothWSLAndHypervSupported;
 }
 
 export function sendTelemetryRecords(
@@ -1881,6 +1904,9 @@ export async function createMachine(
   let provider: string | undefined;
   if (params['podman.factory.machine.provider']) {
     provider = getProviderByLabel(params['podman.factory.machine.provider']);
+    telemetryRecords.provider = provider;
+  } else if (params['podman.factory.machine.win.provider']) {
+    provider = params['podman.factory.machine.win.provider'];
     telemetryRecords.provider = provider;
   }
 
