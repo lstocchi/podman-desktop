@@ -96,7 +96,12 @@ onMount(async () => {
   osMemory = await window.getOsMemory();
   osCpu = await window.getOsCpu();
   osFreeDisk = await window.getOsFreeDiskSize();
-  contextsUnsubscribe = context.subscribe(value => (globalContext = value));
+  contextsUnsubscribe = context.subscribe(value => {
+    console.log(JSON.stringify(globalContext?.value))
+    console.log(JSON.stringify(value.value))
+    globalContext = value;
+    loadConnectionParams().catch((e: unknown) => console.error('unable to reload connection params'));
+  });
 
   // check if we have an existing action
   const operationConnectionInfoMap = get(operationConnectionsInfo);
@@ -119,6 +124,40 @@ onMount(async () => {
     }
   }
 
+  if (taskId === undefined) {
+    taskId = operationConnectionInfoMap.size + 1;
+  }
+
+  await loadConnectionParams();
+
+  const data: any = {};
+  for (let field of configurationKeys) {
+    const id = field.id;
+    if (id) {
+      data[id] = field.default;
+    }
+  }
+  if (!connectionInfo) {
+    try {
+      connectionAuditResult = await window.auditConnectionParameters(providerInfo.internalId, data);
+    } catch (e: any) {
+      console.warn(e.message);
+    }
+  }
+ 
+  pageIsLoading = false;
+});
+
+onDestroy(() => {
+  if (loggerHandlerKey) {
+    disconnectUI(loggerHandlerKey);
+  }
+  if (contextsUnsubscribe) {
+    contextsUnsubscribe();
+  }
+});
+
+async function loadConnectionParams() {  
   configurationKeys = properties
     .filter(property =>
       Array.isArray(property.scope) ? property.scope.find(s => s === propertyScope) : property.scope === propertyScope,
@@ -164,43 +203,16 @@ onMount(async () => {
     });
   if (connectionInfo) {
     configurationKeys = configurationKeys.filter(property => !property.readonly);
-  }
-
-  if (taskId === undefined) {
-    taskId = operationConnectionInfoMap.size + 1;
-  }
-
-  const data: any = {};
-  for (let field of configurationKeys) {
-    const id = field.id;
-    if (id) {
-      data[id] = field.default;
-    }
-  }
-  if (!connectionInfo) {
-    try {
-      connectionAuditResult = await window.auditConnectionParameters(providerInfo.internalId, data);
-    } catch (e: any) {
-      console.warn(e.message);
-    }
-  }
-  pageIsLoading = false;
-});
-
-onDestroy(() => {
-  if (loggerHandlerKey) {
-    disconnectUI(loggerHandlerKey);
-  }
-  if (contextsUnsubscribe) {
-    contextsUnsubscribe();
-  }
-});
+  }  
+}
 
 function handleInvalidComponent() {
   isValid = false;
 }
 
-async function handleValidComponent() {
+async function handleValidComponent(recordid: string) {
+  console.log('handleValidComponent');
+  console.log(recordid);
   isValid = true;
 
   // it can happen (at least in tests) that some fields are not set yet (NumberItem will wait 500ms before to change value)
@@ -228,8 +240,12 @@ async function handleValidComponent() {
 function internalSetConfigurationValue(id: string, modified: boolean, value: string | boolean | number) {
   const item = configurationValues.get(id);
   if (item) {
-    item.modified = modified;
-    item.value = value;
+    // if it's happening a podman desktop update (the value is reset, modified = false) and the value stored has already been updated by the user (modified = true)
+    // it is skipped 
+    if (modified || !item.modified) {
+      item.modified = modified;
+      item.value = value;
+    }    
   } else {
     configurationValues.set(id, { modified, value });
   }
@@ -414,12 +430,23 @@ function closePage() {
 function getConnectionResourceConfigurationValue(
   configurationKey: IConfigurationPropertyRecordedSchema,
   configurationValues: Map<string, { modified: boolean; value: string | boolean | number }>,
-): number | undefined {
+): string | boolean | number | undefined {
   if (configurationKey.id && configurationValues.has(configurationKey.id)) {
     const value = configurationValues.get(configurationKey.id);
-    if (typeof value?.value === 'number') {
+    if (value?.value !== undefined) {
       return value.value;
     }
+  }
+  return undefined;
+}
+
+function getConnectionResourceConfigurationNumberValue(
+  configurationKey: IConfigurationPropertyRecordedSchema,
+  configurationValues: Map<string, { modified: boolean; value: string | boolean | number }>,
+): number | undefined {
+  const value = getConnectionResourceConfigurationValue(configurationKey, configurationValues);
+  if (typeof value === 'number') {
+    return value;
   }
   return undefined;
 }
@@ -500,7 +527,7 @@ function getConnectionResourceConfigurationValue(
                     <div class="text-gray-600">
                       <EditableConnectionResourceItem
                         record={configurationKey}
-                        value={getConnectionResourceConfigurationValue(configurationKey, configurationValues)}
+                        value={getConnectionResourceConfigurationNumberValue(configurationKey, configurationValues)}
                         onSave={setConfigurationValue} />
                     </div>
                   {/if}

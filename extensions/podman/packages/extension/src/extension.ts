@@ -94,6 +94,8 @@ const krunkitHelper = new KrunkitHelper();
 const podmanBinaryHelper = new PodmanBinaryLocationHelper();
 const podmanInfoHelper = new PodmanInfoHelper();
 
+let wslEnabled = false;
+
 let shouldNotifySetup = true;
 const setupPodmanNotification: extensionApi.NotificationOptions = {
   title: 'Podman needs to be set up',
@@ -1011,6 +1013,7 @@ export const PODMAN_MACHINE_CPU_SUPPORTED_KEY = 'podman.podmanMachineCpuSupporte
 export const PODMAN_MACHINE_MEMORY_SUPPORTED_KEY = 'podman.podmanMachineMemorySupported';
 export const PODMAN_MACHINE_DISK_SUPPORTED_KEY = 'podman.podmanMachineDiskSupported';
 export const PODMAN_PROVIDER_LIBKRUN_SUPPORTED_KEY = 'podman.isLibkrunSupported';
+export const WSL_ENABLED_KEY = 'podman.isWslEnabled';
 export const WSL_HYPERV_ENABLED_KEY = 'podman.wslHypervEnabled';
 
 export function initTelemetryLogger(): void {
@@ -1483,6 +1486,11 @@ export async function activate(extensionContext: extensionApi.ExtensionContext):
       initialize: () => createMachine({}),
       create: createMachine,
       creationDisplayName: 'Podman machine',
+    },
+    {
+      auditItems: async (items: extensionApi.AuditRequestItems) => {
+        return await connectionAuditor(items);
+      },
     });
   }
 
@@ -1662,17 +1670,32 @@ export async function activate(extensionContext: extensionApi.ExtensionContext):
   podmanRemoteConnections.start();
 }
 
+async function connectionAuditor(items: extensionApi.AuditRequestItems): Promise<extensionApi.AuditResult> {
+  const records: extensionApi.AuditRecord[] = [];
+  const auditResult = {
+    records: records,
+  };
+
+  const winProvider = items['podman.factory.machine.win.provider'];
+  const isWSL = winProvider === 'wsl';
+  if (wslEnabled !== isWSL) {
+    wslEnabled = isWSL;
+    extensionApi.context.setValue(WSL_ENABLED_KEY, wslEnabled);
+  }  
+
+  return auditResult;
+}
+
 export async function calcPodmanMachineSetting(podmanConfiguration: PodmanConfiguration): Promise<void> {
   let cpuSupported = true;
   let memorySupported = true;
   let diskSupported = true;
 
   if (isWindows()) {
-    const isPodmanHyperv_Env = process.env.CONTAINERS_MACHINE_PROVIDER === 'hyperv';
-    const isPodmanHyperv_Config = await podmanConfiguration.matchRegexpInContainersConfig(/provider\s*=\s*"hyperv"/);
-    cpuSupported = isPodmanHyperv_Env || isPodmanHyperv_Config;
-    memorySupported = isPodmanHyperv_Env || isPodmanHyperv_Config;
-    diskSupported = isPodmanHyperv_Env || isPodmanHyperv_Config;
+    const isHyperV = await isHyperVEnabled();    
+    cpuSupported = isHyperV;
+    memorySupported = isHyperV;
+    diskSupported = isHyperV;
   }
 
   extensionApi.context.setValue(PODMAN_MACHINE_CPU_SUPPORTED_KEY, cpuSupported);
@@ -1800,14 +1823,22 @@ export async function isWSLAndHypervSupported(): Promise<boolean> {
     return bothWSLAndHypervSupported;
   }
 
-  const wslCheck = new SequenceCheck('WSL platform', [new WSLVersionCheck(), new WSL2Check()]);
-  const wslCheckResult = await wslCheck.execute();
-  if (wslCheckResult.successful) {
-    const hyperVCheck = new HyperVCheck();
-    const hyperVCheckResult = await hyperVCheck.execute();
-    bothWSLAndHypervSupported = hyperVCheckResult.successful;
+  if (await isWSLEnabled()) {
+    bothWSLAndHypervSupported = await isHyperVEnabled();
   }
   return bothWSLAndHypervSupported;
+}
+
+async function isWSLEnabled(): Promise<boolean> {
+  const wslCheck = new SequenceCheck('WSL platform', [new WSLVersionCheck(), new WSL2Check()]);
+  const wslCheckResult = await wslCheck.execute();
+  return wslCheckResult.successful;
+}
+
+async function isHyperVEnabled(): Promise<boolean> {
+  const hyperVCheck = new HyperVCheck();
+  const hyperVCheckResult = await hyperVCheck.execute();
+  return hyperVCheckResult.successful;
 }
 
 export function sendTelemetryRecords(
